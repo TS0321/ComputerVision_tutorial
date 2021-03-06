@@ -42,7 +42,7 @@ int main(void)
 			for (int x = 0; x < pattern_size.width; x++)
 			{
 				cv::Point3f tmp_point = cv::Point3f(x * pattern_interval, y * pattern_interval, 0);
-				std::cout << tmp_point << std::endl;
+				//std::cout << tmp_point << std::endl;
 				tmp.push_back(tmp_point);
 
 			}
@@ -57,7 +57,7 @@ int main(void)
 
 	cv::calibrateCamera(objPoints, centers, img_size, cameraMatrix, distCoeffs, rvecs, tvecs, 0, cv::TermCriteria());
 
-	std::cout << cameraMatrix << std::endl;
+	//std::cout << cameraMatrix << std::endl;
 
 	for (int i = 0; i < cap_imgs.size(); i++)
 	{
@@ -68,6 +68,47 @@ int main(void)
 		cv::imshow("cap_img", cap_imgs[i]);
 		cv::waitKey(0);
 	}
+
+	std::cout << "start capture !" << std::endl;
+	cv::VideoCapture cap(1);//デバイスのオープン
+//cap.open(0);//こっちでも良い．
+//cap.set(cv::CAP_PROP_FOCUS, 500);
+	const int camera_width = 1280;
+	const int camera_height = 720;
+
+	cap.set(cv::CAP_PROP_FRAME_WIDTH, camera_width);
+	cap.set(cv::CAP_PROP_FRAME_HEIGHT, camera_height);
+
+	if (!cap.isOpened())//カメラデバイスが正常にオープンしたか確認．
+	{
+		//読み込みに失敗したときの処理
+		return -1;
+	}
+
+	cv::Mat frame; //取得したフレーム
+	int img_num = 0;
+	while (cap.read(frame))//無限ループ
+	{
+		//
+		//取得したフレーム画像に対して，クレースケール変換や2値化などの処理を書き込む．
+		//
+		std::vector<cv::Point2f> centers;
+		bool isFound = cv::findCirclesGrid(frame, pattern_size, centers);
+		cv::Mat rvec;
+		cv::Mat tvec;
+		if (isFound) {
+			cv::solvePnP(objPoints[0], centers, cameraMatrix, distCoeffs, rvec, tvec, cv::SOLVEPNP_ITERATIVE);
+			cv::aruco::drawAxis(frame, cameraMatrix, distCoeffs, rvec, tvec, 40);
+		}
+		
+		cv::imshow("win", frame);//画像を表示．
+		const int key = cv::waitKey(1);
+		if (key == 'q'/*113*/)//qボタンが押されたとき
+		{
+			break;//whileループから抜ける．
+		}
+	}
+	cv::destroyAllWindows();
 
 
 	return 0;
