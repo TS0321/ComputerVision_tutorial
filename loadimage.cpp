@@ -5,7 +5,7 @@ std::vector<cv::Mat> loadImage(const std::string& folder_name, const int& img_nu
 	for (int i = 0; i < img_num; i++)
 	{
 		cv::Mat img = cv::imread(folder_name + "/img" + std::to_string(i) + ".png", cv::IMREAD_COLOR);
-		imgs.push_back(img);
+		imgs[i] = img;
 	}
 
 	return imgs;

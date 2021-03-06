@@ -14,6 +14,7 @@ int main(void)
 	std::vector<cv::Mat> cap_imgs;
 	std::string folder_name = "../Capdata";
 	cap_imgs = loadImage(folder_name, img_num);
+	std::cout << cap_imgs.size() << std::endl;
 
 	//ドットパターンの検出
 	cv::Size pattern_size(12, 8);
