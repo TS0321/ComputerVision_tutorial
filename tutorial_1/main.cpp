@@ -3,8 +3,8 @@
 #include <string>
 #include <opencv2/opencv.hpp>
 #include <opencv2/aruco.hpp>
-#include "loadimage.hpp"
-#include "CameraCalibration.hpp"
+#include "../loadimage.hpp"
+#include "../CameraCalibration.hpp"
 
 static const int img_num = 10;
 

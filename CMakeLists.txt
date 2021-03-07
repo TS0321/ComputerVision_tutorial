@@ -10,11 +10,12 @@ target_link_libraries(tutorial_1 PUBLIC ${OpenCV_LIBS})
 target_include_directories(tutorial_1 PUBLIC ${OpenCV_INCLUDE_DIRS})
 
 #tutorial_2
-add_executable(tutorial_2 tutorial_2/main.cpp CameraCalibration.cpp CameraCalibration.hpp loadimage.cpp loadimage.hpp)
+add_executable(tutorial_2 tutorial_2/main.cpp CameraCalibration.cpp CameraCalibration.hpp loadimage.cpp loadimage.hpp CalcPose.cpp CalcPose.hpp)
 find_package(OpenCV REQUIRED)
 target_link_libraries(tutorial_2 PUBLIC ${OpenCV_LIBS})
 target_include_directories(tutorial_2 PUBLIC ${OpenCV_INCLUDE_DIRS})
-
+find_package(Eigen3 REQUIRED)
+target_include_directories(tutorial_2 PUBLIC ${EIGEN3_INCLUDE_DIRS})
 
 
 
