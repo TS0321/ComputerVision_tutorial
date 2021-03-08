@@ -67,11 +67,6 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 	}
 	const int points_num = imgPoints.size();
 	Eigen::Matrix<double, Eigen::Dynamic, 12> A(2 * points_num, 12);
-	Eigen::Vector3d object_point_average;
-	Eigen::Vector2d detected_point_average;
-	object_point_average.setZero();
-	detected_point_average.setZero();
-
 
 	for (int i = 0; i < points_num; i++)
 	{
@@ -90,15 +85,7 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 
 	}
 
-	object_point_average /= points_num;
-	detected_point_average /= points_num;
-
-
-	//std::cout << "A : " <<  A << std::endl;
-	Eigen::Matrix<double, 12, 12> AtA;
-	AtA = A.transpose() * A;
-	//std::cout << "AtA : " <<  AtA << std::endl;
-	Eigen::JacobiSVD<Eigen::MatrixXd> svd(AtA, Eigen::ComputeFullU | Eigen::ComputeFullV);
+	Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
 	int min_sigularIndex = 0;
 	Eigen::VectorXd sigular_valueVec = svd.singularValues();
 	for (int i = 0; i < 12; i++)
@@ -111,17 +98,12 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 	}
 	Eigen::Matrix<double, 12, 1> min_eigenVec = svd.matrixV().col(min_sigularIndex);
 
-
-
 	Eigen::Matrix<double, 3, 4> P;
 	P.setIdentity();
 	P << min_eigenVec(0), min_eigenVec(1), min_eigenVec(2), min_eigenVec(3),
 		min_eigenVec(4), min_eigenVec(5), min_eigenVec(6), min_eigenVec(7),
 		min_eigenVec(8), min_eigenVec(9), min_eigenVec(10), min_eigenVec(11);
-	//P /= min_eigenVec(11);
-	std::cout << "P : " << P << std::endl;
-	Eigen::Matrix<double, 3, 4> P_default;
-	P_default = P;
+
 	double scale = std::sqrt(P(0, 0) * P(0, 0) + P(0, 1) * P(0, 1) + P(0, 2) * P(0, 2)) * 
 		std::sqrt(P(1, 0) * P(1, 0) + P(1, 1) * P(1, 1) + P(1, 2) * P(1, 2)) * 
 		std::sqrt(P(2, 0) * P(2, 0) + P(2, 1) * P(2, 1) + P(2, 2) * P(2, 2));
@@ -134,24 +116,7 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 	if (projected_point(2) < 0)
 	{
 		P = -P;
-		P_default = -P_default;
 	}
-
-	Eigen::Vector3d projected_point_ave;
-	projected_point_ave.setZero();
-	projected_point.setZero();
-	Eigen::Vector3d objPoint_ave;
-	objPoint_ave.setZero();
-	for (int i = 0; i < points_num; i++)
-	{
-		Eigen::Vector4d worldPoint(objPoints[i].x(), objPoints[i].y(), objPoints[i].z(), 1);
-		projected_point_ave += P * worldPoint;
-		objPoint_ave += objPoints[i];
-	}
-	projected_point_ave /= points_num;
-	objPoint_ave /= points_num;
-	projected_point_ave = P * world_point;
-	objPoint_ave = objPoints[0];
 
 
 	Eigen::Matrix<double, 3, 3> R;
@@ -168,13 +133,7 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 
 	Eigen::Matrix<double, 3, 1> t;
 	t.setZero();
-	/*t(0) = P(0, 3);
-	t(1) = P(1, 3);
-	t(2) = P(2, 3);
-	*/
-	t = projected_point_ave - R * objPoint_ave;
-	std::cout << "R : " << R << std::endl;
-	std::cout << "t : " << t << std::endl;
+	t = Eigen::Vector3d(P(0, 3), P(1, 3), P(2, 3));
 
 	Eigen::Isometry3d pose;
 	Eigen::Matrix<double, 4, 4> transMat;
@@ -217,16 +176,12 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 			Eigen::Matrix<double, 3, 6> Jb;
 			Ja.setZero();
 			Jb.setZero();
-			const double& X = objPoints[i].x();
-			const double& Y = objPoints[i].y();
-			const double& Z = objPoints[i].z();
-			Eigen::Vector3d objPoint(X, Y, Z);
-			Eigen::Vector3d cam_Point;
-			cam_Point = R_Mat * objPoint + transVec;
-			const double X_ = cam_Point.x();
-			const double Y_ = cam_Point.y();
-			const double Z_ = cam_Point.z();
-			//std::cout << "camPoint : " << cam_Point << std::endl;
+			const Eigen::Vector3d objPoint = objPoints[i];
+			Eigen::Vector3d cam_Point = R_Mat * objPoint + transVec;
+			const double X = cam_Point.x();
+			const double Y = cam_Point.y();
+			const double Z = cam_Point.z();
+
 			Eigen::Vector3d R_objPoint;
 			R_objPoint.setZero();
 			R_objPoint = R_Mat * objPoint;
@@ -234,10 +189,11 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 			const double& Yr = R_objPoint(1);
 			const double& Zr = R_objPoint(2);
 
-			Ja(0, 0) = 1 / Z_;
-			Ja(0, 2) = -X_ / (Z_ * Z_);
-			Ja(1, 1) = 1 / Z_;
-			Ja(1, 2) = -Y_ / (Z_ * Z_);
+			//ƒ„ƒRƒrƒAƒ“‚ÌŒvŽZ
+			Ja(0, 0) = 1 / Z;
+			Ja(0, 2) = -X / (Z * Z);
+			Ja(1, 1) = 1 / Z;
+			Ja(1, 2) = -Y / (Z * Z);
 
 			Jb(0, 0) = 0;
 			Jb(0, 1) = Zr;
@@ -255,43 +211,26 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 			J = Ja * Jb;
 			JtJ += J.transpose() * J;
 
-			//Eigen::AngleAxisd rot(R_Mat);
-			//Eigen::Vector3d P_cam;
-			//P_cam = rot.matrix() * objPoint + t;
 			Eigen::Vector2d projected_point;
 			projected_point.setZero();
-			projected_point(0) = X_ / Z_;
-			projected_point(1) = Y_ / Z_;
+			projected_point(0) = X / Z;
+			projected_point(1) = Y / Z;
 
 			Eigen::Vector2d E;
 			E.setZero();
+			//Ä“Š‰eŒë·‚ÌŒvŽZ
 			E = imgPoints[i] - projected_point;
 			E = -E;
 
 			JtE += J.transpose() * E;
 		}
 
-
 		Eigen::FullPivLU< Eigen::Matrix<double, 6, 6>> lu(JtJ);
-		//std::cout << "JtJ : " << JtJ << std::endl;
 		Eigen::Matrix<double, 6, 1> x;
 		x = lu.solve(JtE);
-		//std::cout << "delta : " << x.norm() << std::endl;
-		if (x.norm() < 0.0001) break;
-		//Eigen::AngleAxisd rot(pose.rotation().matrix());
 		delta_Q = x;
-		std::cout << "delta_Q : " << delta_Q.norm() << std::endl;
+		if (delta_Q.norm() < 0.001) break;
 		Q -= delta_Q;
-		//Eigen::Isometry3d delta_pose;
-		//delta_pose.setIdentity();
-		//Eigen::Vector3d axis(x(0), x(1), x(2));
-		//Eigen::AngleAxisd delta_rot(axis.norm(), axis.normalized());
-		//Eigen::Vector3d delta_trans(x(3), x(4), x(5));
-		
-		
-		//pose.prerotate(delta_rot);
-		//pose.pretranslate(delta_trans);
-
 	}
 
 	rotVec = Eigen::Vector3d(Q(0), Q(1), Q(2));
@@ -302,8 +241,6 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 	pose.pretranslate(translation);
 	std::cout << "pose: " << pose.matrix() << std::endl;
 	current_pose = pose;
-
-
 
 	return true;
 }
