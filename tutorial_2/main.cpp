@@ -63,9 +63,10 @@ int main(void)
 			double x = 0;
 			double y = 0;
 			//normalize(fx, fy, cx, cy, u, v, x, y);
+			normalize(fx, fy, cx, cy, u, v, x, y);
 			//std::cout << "x : " << x << std::endl;
 			//std::cout << "y : " << y << std::endl;
-			imgPoints.push_back(Eigen::Vector2d(u, v));
+			imgPoints.push_back(Eigen::Vector2d(x, y));
 
 			double X = double(objPoints[i][j].x);
 			double Y = double(objPoints[i][j].y);
@@ -74,7 +75,8 @@ int main(void)
 		}
 
 
-		calcPose_Plane(tmp_objPoints, imgPoints, cameraMatrix_eigen, pose);
+		//calcPose_Plane(tmp_objPoints, imgPoints, cameraMatrix_eigen, pose);
+		calcPose(tmp_objPoints, imgPoints, pose);
 		Eigen::Matrix3f R = pose.rotation().matrix().cast<float>();
 		cv::eigen2cv(R, rvec);
 		cv::Rodrigues(rvec, rvec);
