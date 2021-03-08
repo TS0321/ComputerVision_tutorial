@@ -182,100 +182,125 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 	transMat << R, t;
 	pose.matrix() = transMat;
 
-	//Eigen::Matrix<double, 6, 6> JtJ;
-	//Eigen::Matrix<double, 6, 1> JtE;
+	Eigen::Matrix<double, 6, 6> JtJ;
+	Eigen::Matrix<double, 6, 1> JtE;
 
-	//int cnt = 0;
-	//while (1) {
-	//	JtJ.setZero();
-	//	JtE.setZero();
-	//	if (cnt++ > 10)
-	//	{
-	//		break;
-	//	}
+	Eigen::Matrix<double, 6, 1> Q;
+	Eigen::Matrix<double, 6, 1>delta_Q;
+	Q.setZero();
+	delta_Q.setZero();
 
-	//	for (int i = 0; i < points_num; i++)
-	//	{
-	//		const Eigen::Matrix<double, 3, 3> R_Mat = pose.rotation().matrix();
-	//		const Eigen::Vector3d transVec = pose.translation().matrix();
+	Eigen::AngleAxisd rot(pose.rotation().matrix());
+	Eigen::Vector3d rotVec = rot.axis() * rot.angle();
+	Eigen::Vector3d translation = pose.translation().matrix();
+	Q << rotVec(0), rotVec(1), rotVec(2), translation(0), translation(1), translation(2);
 
-	//		Eigen::Matrix<double, 2, 3> Ja;
-	//		Eigen::Matrix<double, 3, 6> Jb;
-	//		Ja.setZero();
-	//		Jb.setZero();
-	//		const double& X = objPoints[i].x();
-	//		const double& Y = objPoints[i].y();
-	//		const double& Z = objPoints[i].z();
-	//		Eigen::Vector3d objPoint(X, Y, Z);
-	//		Eigen::Vector3d cam_Point;
-	//		cam_Point = R_Mat * objPoint + transVec;
-	//		const double X_ = cam_Point.x();
-	//		const double Y_ = cam_Point.y();
-	//		const double Z_ = cam_Point.z();
-	//		//std::cout << "camPoint : " << cam_Point << std::endl;
-	//		Eigen::Vector3d R_objPoint;
-	//		R_objPoint.setZero();
-	//		R_objPoint = R_Mat * objPoint;
-	//		const double& Xr = R_objPoint(0);
-	//		const double& Yr = R_objPoint(1);
-	//		const double& Zr = R_objPoint(2);
+	int cnt = 0;
+	while (1) {
+		JtJ.setZero();
+		JtE.setZero();
+		if (cnt++ > 10)
+		{
+			break;
+		}
 
-	//		Ja(0, 0) = 1 / Z_;
-	//		Ja(0, 2) = -X_ / (Z_ * Z_);
-	//		Ja(1, 1) = 1 / Z_;
-	//		Ja(1, 2) = -Y_ / (Z_ * Z_);
+		for (int i = 0; i < points_num; i++)
+		{
+			Eigen::Vector3d rotVec(Q(0), Q(1), Q(2));
+			Eigen::Vector3d translation(Q(3), Q(4), Q(5));
+			Eigen::AngleAxisd rot(rotVec.norm(), rotVec.normalized());
 
-	//		Jb(0, 0) = 0;
-	//		Jb(0, 1) = Zr;
-	//		Jb(0, 2) = -Yr;
-	//		Jb(0, 3) = 1;
-	//		Jb(1, 0) = -Zr;
-	//		Jb(1, 2) = Xr;
-	//		Jb(1, 4) = 1;
-	//		Jb(2, 0) = Yr;
-	//		Jb(2, 1) = -Xr;
-	//		Jb(2, 5) = 1;
+			const Eigen::Matrix<double, 3, 3> R_Mat = rot.toRotationMatrix();
+			const Eigen::Vector3d transVec = translation;
 
+			Eigen::Matrix<double, 2, 3> Ja;
+			Eigen::Matrix<double, 3, 6> Jb;
+			Ja.setZero();
+			Jb.setZero();
+			const double& X = objPoints[i].x();
+			const double& Y = objPoints[i].y();
+			const double& Z = objPoints[i].z();
+			Eigen::Vector3d objPoint(X, Y, Z);
+			Eigen::Vector3d cam_Point;
+			cam_Point = R_Mat * objPoint + transVec;
+			const double X_ = cam_Point.x();
+			const double Y_ = cam_Point.y();
+			const double Z_ = cam_Point.z();
+			//std::cout << "camPoint : " << cam_Point << std::endl;
+			Eigen::Vector3d R_objPoint;
+			R_objPoint.setZero();
+			R_objPoint = R_Mat * objPoint;
+			const double& Xr = R_objPoint(0);
+			const double& Yr = R_objPoint(1);
+			const double& Zr = R_objPoint(2);
 
-	//		Eigen::Matrix<double, 2, 6> J;
-	//		J = Ja * Jb;
-	//		JtJ += J.transpose() * J;
+			Ja(0, 0) = 1 / Z_;
+			Ja(0, 2) = -X_ / (Z_ * Z_);
+			Ja(1, 1) = 1 / Z_;
+			Ja(1, 2) = -Y_ / (Z_ * Z_);
 
-	//		Eigen::AngleAxisd rot(R_Mat);
-	//		//Eigen::Vector3d P_cam;
-	//		//P_cam = rot.matrix() * objPoint + t;
-	//		Eigen::Vector2d projected_point;
-	//		projected_point.setZero();
-	//		projected_point(0) = X_ / Z_;
-	//		projected_point(1) = Y_ / Z_;
-
-	//		Eigen::Vector2d E;
-	//		E.setZero();
-	//		E = imgPoints[i] - projected_point;
-	//		E = -E;
-
-	//		JtE += J.transpose() * E;
-	//	}
+			Jb(0, 0) = 0;
+			Jb(0, 1) = Zr;
+			Jb(0, 2) = -Yr;
+			Jb(0, 3) = 1;
+			Jb(1, 0) = -Zr;
+			Jb(1, 2) = Xr;
+			Jb(1, 4) = 1;
+			Jb(2, 0) = Yr;
+			Jb(2, 1) = -Xr;
+			Jb(2, 5) = 1;
 
 
-	//	Eigen::FullPivLU< Eigen::Matrix<double, 6, 6>> lu(JtJ);
-	//	//std::cout << "JtJ : " << JtJ << std::endl;
-	//	Eigen::Matrix<double, 6, 1> x;
-	//	x = lu.solve(JtE);
-	//	//std::cout << "delta : " << x.norm() << std::endl;
-	//	if (x.norm() < 0.0001) break;
-	//	Eigen::AngleAxisd rot(pose.rotation().matrix());
+			Eigen::Matrix<double, 2, 6> J;
+			J = Ja * Jb;
+			JtJ += J.transpose() * J;
 
-	//	//Eigen::Isometry3d delta_pose;
-	//	//delta_pose.setIdentity();
-	//	Eigen::Vector3d axis(x(0), x(1), x(2));
-	//	Eigen::AngleAxisd delta_rot(axis.norm(), axis.normalized());
-	//	Eigen::Vector3d delta_trans(x(3), x(4), x(5));
-	//	pose.prerotate(delta_rot);
-	//	pose.pretranslate(delta_trans);
+			//Eigen::AngleAxisd rot(R_Mat);
+			//Eigen::Vector3d P_cam;
+			//P_cam = rot.matrix() * objPoint + t;
+			Eigen::Vector2d projected_point;
+			projected_point.setZero();
+			projected_point(0) = X_ / Z_;
+			projected_point(1) = Y_ / Z_;
 
-	//}
+			Eigen::Vector2d E;
+			E.setZero();
+			E = imgPoints[i] - projected_point;
+			E = -E;
 
+			JtE += J.transpose() * E;
+		}
+
+
+		Eigen::FullPivLU< Eigen::Matrix<double, 6, 6>> lu(JtJ);
+		//std::cout << "JtJ : " << JtJ << std::endl;
+		Eigen::Matrix<double, 6, 1> x;
+		x = lu.solve(JtE);
+		//std::cout << "delta : " << x.norm() << std::endl;
+		if (x.norm() < 0.0001) break;
+		//Eigen::AngleAxisd rot(pose.rotation().matrix());
+		delta_Q = x;
+		std::cout << "delta_Q : " << delta_Q.norm() << std::endl;
+		Q -= delta_Q;
+		//Eigen::Isometry3d delta_pose;
+		//delta_pose.setIdentity();
+		//Eigen::Vector3d axis(x(0), x(1), x(2));
+		//Eigen::AngleAxisd delta_rot(axis.norm(), axis.normalized());
+		//Eigen::Vector3d delta_trans(x(3), x(4), x(5));
+		
+		
+		//pose.prerotate(delta_rot);
+		//pose.pretranslate(delta_trans);
+
+	}
+
+	rotVec = Eigen::Vector3d(Q(0), Q(1), Q(2));
+	rot = Eigen::AngleAxisd(rotVec.norm(), rotVec.normalized());
+	translation = Eigen::Vector3d(Q(3), Q(4), Q(5));
+	pose.setIdentity();
+	pose.prerotate(rot);
+	pose.pretranslate(translation);
+	std::cout << "pose: " << pose.matrix() << std::endl;
 	current_pose = pose;
 
 

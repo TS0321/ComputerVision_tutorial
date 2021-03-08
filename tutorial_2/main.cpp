@@ -82,7 +82,7 @@ int main(void)
 		cv::Rodrigues(rvec, rvec);
 		Eigen::Vector3f t = pose.translation().matrix().cast<float>();
 		cv::eigen2cv(t, tvec);
-		//cv::solvePnP(objPoints[i], centers[i], cameraMatrix, distCoeffs, rvec, tvec, cv::SOLVEPNP_ITERATIVE);
+		cv::solvePnP(objPoints[i], centers[i], cameraMatrix, distCoeffs, rvec, tvec, cv::SOLVEPNP_ITERATIVE);
 		
 		cv::aruco::drawAxis(cap_imgs[i], cameraMatrix, distCoeffs, rvec, tvec, 40);
 		std::cout << "eigen_R : " << R << std::endl;
