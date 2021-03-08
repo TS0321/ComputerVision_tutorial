@@ -62,10 +62,7 @@ int main(void)
 
 			double x = 0;
 			double y = 0;
-			//normalize(fx, fy, cx, cy, u, v, x, y);
 			normalize(fx, fy, cx, cy, u, v, x, y);
-			//std::cout << "x : " << x << std::endl;
-			//std::cout << "y : " << y << std::endl;
 			imgPoints.push_back(Eigen::Vector2d(x, y));
 
 			double X = double(objPoints[i][j].x);
