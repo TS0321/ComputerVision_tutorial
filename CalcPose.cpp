@@ -61,10 +61,12 @@ bool calcPose_Plane(const std::vector<Eigen::Vector3d>& objPoints, const std::ve
 
 bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<Eigen::Vector2d>& imgPoints, Eigen::Isometry3d& current_pose)
 {
+	//3次元点と２次元点の数が異なるときを省く
 	if (objPoints.size() != imgPoints.size()) 
 	{
 		return false;
 	}
+
 	const int points_num = imgPoints.size();
 	Eigen::Matrix<double, Eigen::Dynamic, 12> A(2 * points_num, 12);
 
@@ -82,11 +84,11 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 
 		A.row(2 * i) = a.row(0);
 		A.row(2 * i + 1) = a.row(1);
-
 	}
 
 	Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
-	int min_sigularIndex = 0;
+	int min_sigularIndex = 0;	//最小特異値のインデックス
+	/*最小特異ベクトルの抽出*/
 	Eigen::VectorXd sigular_valueVec = svd.singularValues();
 	for (int i = 0; i < 12; i++)
 	{
@@ -96,14 +98,15 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 		}
 		min_sigularIndex = i;
 	}
-	Eigen::Matrix<double, 12, 1> min_eigenVec = svd.matrixV().col(min_sigularIndex);
+	Eigen::Matrix<double, 12, 1> min_eigenVec = svd.matrixV().col(min_sigularIndex);	//最小特異ベクトル
 
-	Eigen::Matrix<double, 3, 4> P;
+	Eigen::Matrix<double, 3, 4> P;	//透視投影行列
 	P.setIdentity();
 	P << min_eigenVec(0), min_eigenVec(1), min_eigenVec(2), min_eigenVec(3),
 		min_eigenVec(4), min_eigenVec(5), min_eigenVec(6), min_eigenVec(7),
 		min_eigenVec(8), min_eigenVec(9), min_eigenVec(10), min_eigenVec(11);
 
+	/*回転行列R部分を正規化*/
 	double scale = std::sqrt(P(0, 0) * P(0, 0) + P(0, 1) * P(0, 1) + P(0, 2) * P(0, 2)) * 
 		std::sqrt(P(1, 0) * P(1, 0) + P(1, 1) * P(1, 1) + P(1, 2) * P(1, 2)) * 
 		std::sqrt(P(2, 0) * P(2, 0) + P(2, 1) * P(2, 1) + P(2, 2) * P(2, 2));
@@ -113,12 +116,13 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 	P = P / scale;
 	Eigen::Vector4d world_point(objPoints[0].x(), objPoints[0].y(), objPoints[0].z(), 1);
 	Eigen::Vector3d projected_point = P * world_point;
+	/*カメラ座標のZが負の場合は符号を逆転*/
 	if (projected_point(2) < 0)
 	{
 		P = -P;
 	}
 
-
+	/*回転行列を求める*/
 	Eigen::Matrix<double, 3, 3> R;
 	R.setIdentity();
 	R << P(0, 0), P(0, 1), P(0, 2),
@@ -131,28 +135,20 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 	sigma(2, 2) = (svd_R.matrixU() * svd_R.matrixV().transpose()).determinant();
 	R = svd_R.matrixU() * sigma * svd_R.matrixV().transpose();
 
+	/*並進ベクトルを求める*/
 	Eigen::Matrix<double, 3, 1> t;
 	t.setZero();
 	t = Eigen::Vector3d(P(0, 3), P(1, 3), P(2, 3));
 
-	Eigen::Isometry3d pose;
-	Eigen::Matrix<double, 4, 4> transMat;
-	transMat.setIdentity();
-	transMat << R, t;
-	pose.matrix() = transMat;
-
 	Eigen::Matrix<double, 6, 6> JtJ;
 	Eigen::Matrix<double, 6, 1> JtE;
 
+	
+	//6DoF姿勢パラメータ[ωx, ωy, ωz, tx, ty, tz]
 	Eigen::Matrix<double, 6, 1> Q;
-	Eigen::Matrix<double, 6, 1>delta_Q;
 	Q.setZero();
-	delta_Q.setZero();
-
-	Eigen::AngleAxisd rot(pose.rotation().matrix());
-	Eigen::Vector3d rotVec = rot.axis() * rot.angle();
-	Eigen::Vector3d translation = pose.translation().matrix();
-	Q << rotVec(0), rotVec(1), rotVec(2), translation(0), translation(1), translation(2);
+	Eigen::AngleAxisd rot(R);
+	Q << Eigen::Vector3d(rot.axis() * rot.angle()), t;
 
 	int cnt = 0;
 	while (1) {
@@ -166,11 +162,9 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 		for (int i = 0; i < points_num; i++)
 		{
 			Eigen::Vector3d rotVec(Q(0), Q(1), Q(2));
-			Eigen::Vector3d translation(Q(3), Q(4), Q(5));
 			Eigen::AngleAxisd rot(rotVec.norm(), rotVec.normalized());
-
 			const Eigen::Matrix<double, 3, 3> R_Mat = rot.toRotationMatrix();
-			const Eigen::Vector3d transVec = translation;
+			const Eigen::Vector3d transVec(Q(3), Q(4), Q(5));
 
 			Eigen::Matrix<double, 2, 3> Ja;
 			Eigen::Matrix<double, 3, 6> Jb;
@@ -226,19 +220,19 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 		}
 
 		Eigen::FullPivLU< Eigen::Matrix<double, 6, 6>> lu(JtJ);
-		Eigen::Matrix<double, 6, 1> x;
-		x = lu.solve(JtE);
-		delta_Q = x;
+		Eigen::Matrix<double, 6, 1> delta_Q;
+		delta_Q = lu.solve(JtE);
 		if (delta_Q.norm() < 0.001) break;
 		Q -= delta_Q;
 	}
 
-	rotVec = Eigen::Vector3d(Q(0), Q(1), Q(2));
+	Eigen::Vector3d rotVec(Q(0), Q(1), Q(2));
 	rot = Eigen::AngleAxisd(rotVec.norm(), rotVec.normalized());
-	translation = Eigen::Vector3d(Q(3), Q(4), Q(5));
+	t = Eigen::Vector3d(Q(3), Q(4), Q(5));
+	Eigen::Isometry3d pose;
 	pose.setIdentity();
 	pose.prerotate(rot);
-	pose.pretranslate(translation);
+	pose.pretranslate(t);
 	std::cout << "pose: " << pose.matrix() << std::endl;
 	current_pose = pose;
 
