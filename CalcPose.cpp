@@ -68,7 +68,7 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 	}
 
 	const int points_num = imgPoints.size();
-	Eigen::Matrix<double, Eigen::Dynamic, 12> A(2 * points_num, 12);
+	Eigen::MatrixXd A(2 * points_num, 12);
 
 	for (int i = 0; i < points_num; i++)
 	{
@@ -117,7 +117,7 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 	Eigen::Vector4d world_point(objPoints[0].x(), objPoints[0].y(), objPoints[0].z(), 1);
 	Eigen::Vector3d projected_point = P * world_point;
 	/*カメラ座標のZが負の場合は符号を逆転*/
-	if (projected_point(2) < 0)
+	if (projected_point.z() < 0)
 	{
 		P = -P;
 	}
@@ -125,9 +125,7 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 	/*回転行列を求める*/
 	Eigen::Matrix<double, 3, 3> R;
 	R.setIdentity();
-	R << P(0, 0), P(0, 1), P(0, 2),
-		P(1, 0), P(1, 1), P(1, 2),
-		P(2, 0), P(2, 1), P(2, 2);
+	R = P.leftCols<3>();
 
 	Eigen::JacobiSVD<Eigen::Matrix<double, 3, 3>> svd_R(R, Eigen::ComputeFullU | Eigen::ComputeFullV);
 	Eigen::Matrix<double, 3, 3> sigma;
@@ -138,23 +136,46 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 	/*並進ベクトルを求める*/
 	Eigen::Matrix<double, 3, 1> t;
 	t.setZero();
-	t = Eigen::Vector3d(P(0, 3), P(1, 3), P(2, 3));
+	t = P.rightCols<1>();
 
+	/*位置姿勢行列*/
+	Eigen::Isometry3d pose;
+	pose.setIdentity();
+	pose.prerotate(R);
+	pose.pretranslate(t);
+
+	if (optimizePose(objPoints, imgPoints, pose, 10, 0.001))
+	{
+		current_pose = pose;
+	}
+	
+	return true;
+}
+
+bool optimizePose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<Eigen::Vector2d>& imgPoints, Eigen::Isometry3d& pose, const int iteration_num, const double error_thresh)
+{
+	if (objPoints.size() != imgPoints.size())
+	{
+		return false;
+	}
+
+	/*非線形最適化*/
 	Eigen::Matrix<double, 6, 6> JtJ;
 	Eigen::Matrix<double, 6, 1> JtE;
 
-	
+
 	//6DoF姿勢パラメータ[ωx, ωy, ωz, tx, ty, tz]
 	Eigen::Matrix<double, 6, 1> Q;
 	Q.setZero();
-	Eigen::AngleAxisd rot(R);
-	Q << Eigen::Vector3d(rot.axis() * rot.angle()), t;
+	Eigen::AngleAxisd rot(pose.rotation().matrix());
+	Q << Eigen::Vector3d(rot.axis() * rot.angle()), pose.translation().matrix();
 
+	const size_t points_num = objPoints.size();
 	int cnt = 0;
 	while (1) {
 		JtJ.setZero();
 		JtE.setZero();
-		if (cnt++ > 10)
+		if (cnt++ > iteration_num)
 		{
 			break;
 		}
@@ -222,19 +243,15 @@ bool calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std::vector<E
 		Eigen::FullPivLU< Eigen::Matrix<double, 6, 6>> lu(JtJ);
 		Eigen::Matrix<double, 6, 1> delta_Q;
 		delta_Q = lu.solve(JtE);
-		if (delta_Q.norm() < 0.001) break;
+		if (delta_Q.norm() < error_thresh) break;
 		Q -= delta_Q;
 	}
 
 	Eigen::Vector3d rotVec(Q(0), Q(1), Q(2));
-	rot = Eigen::AngleAxisd(rotVec.norm(), rotVec.normalized());
-	t = Eigen::Vector3d(Q(3), Q(4), Q(5));
-	Eigen::Isometry3d pose;
+		
 	pose.setIdentity();
-	pose.prerotate(rot);
-	pose.pretranslate(t);
-	std::cout << "pose: " << pose.matrix() << std::endl;
-	current_pose = pose;
+	pose.prerotate(Eigen::AngleAxisd(rotVec.norm(), rotVec.normalized()));
+	pose.pretranslate(Eigen::Vector3d(Q(3),Q(4),Q(5)));
 
 	return true;
 }
