@@ -40,5 +40,18 @@ target_include_directories(tutorial_3 PUBLIC ${OpenCV_INCLUDE_DIRS})
 find_package(Eigen3 REQUIRED)
 target_include_directories(tutorial_3 PUBLIC ${EIGEN3_INCLUDE_DIRS})
 
+add_executable(tutorial_4 tutorial4/main.cpp tutorial4/AR_GUI.cpp tutorial4/AR_GUI.hpp tutorial4/AR_Sample.hpp tutorial4/AR_Sample.cpp tutorial4/Camera.hpp tutorial4/Camera.cpp tutorial4/Tracker.cpp tutorial4/Tracker.hpp window.hpp window.cpp)
+find_package(OpenGL REQUIRED)
+target_link_libraries(tutorial_4 PUBLIC opengl32.lib)
+target_include_directories(tutorial_4 PUBLIC ${GLFW_DIR}/include)
+target_link_libraries(tutorial_4 PUBLIC glfw3.lib)
+include_directories(${GLEW_DIR}/include)
+target_link_libraries(tutorial_4 PUBLIC libglew32d.lib glew32d.lib)
+find_package(OpenCV REQUIRED)
+target_link_libraries(tutorial_4 PUBLIC ${OpenCV_LIBS})
+target_include_directories(tutorial_4 PUBLIC ${OpenCV_INCLUDE_DIRS})
+find_package(Eigen3 REQUIRED)
+target_include_directories(tutorial_4 PUBLIC ${EIGEN3_INCLUDE_DIRS})
+
 
 
