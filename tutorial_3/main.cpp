@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <iostream>
 #include <vector>
 #include <string>
@@ -11,11 +13,84 @@
 #include "../CameraCalibration.hpp"
 #include "../CalcPose.hpp"
 #include "../window.hpp"
-#include "../shader.hpp"
-#include "../shape.hpp"
-#include "../object.hpp"
 
-static const int img_num = 10;
+class Test :public Window {
+public:
+
+	std::vector<cv::Mat> capimg;
+	CamParam cparam;
+	Eigen::Isometry3d pose;
+
+	virtual void display(GLFWwindow* window)
+	{
+		const int w = 1280;
+		const int h = 720;
+		const double fx = cparam.fx;
+		const double fy = cparam.fy;
+		const double cx = cparam.cx;
+		const double cy = cparam.cy;
+
+		{
+			srand(0);
+			unsigned char* img = new unsigned char[w * h];
+			for (int i = 0; i < w * h; i++) {
+				img[i] = rand() % 256;
+			}
+			load2D(w, h);
+			glDisable(GL_DEPTH_TEST);
+
+			dispImg(capimg[0], w, h, 3);
+
+			glPointSize(10);
+			glBegin(GL_POINTS);
+			glColor3d(1.0, 1.0, 1.0);
+
+			glVertex2d(0, 0);
+			glVertex2d(w - 1, h - 1);
+			glEnd();
+		}
+		{
+			load3D(w, h, fx, fy, cx, cy);
+			glEnable(GL_DEPTH_TEST);
+
+			double mat[4 * 4] = { 0 };
+			{
+				for (int i = 0; i < 4; i++) {
+					mat[i * 4 + 1] = 1.0;
+				}
+			}
+			Eigen::Map<Eigen::Matrix4d> m(&mat[0]);
+			m = pose.matrix();
+			glLoadMatrixd(mat);
+
+			//X軸
+			glLineWidth(5);
+			glBegin(GL_LINES);
+			glColor3f(1.0, 0.0, 0.0);
+			glVertex3f(0, 0, 0);
+			glVertex3f(20, 0, 0);
+			glEnd();
+			//Y軸
+			glLineWidth(5);
+			glBegin(GL_LINES);
+			glColor3f(0.0, 1.0, 0.0);
+			glVertex3f(0, 0, 0);
+			glVertex3f(0, 20, 0);
+			glEnd();
+			//Z軸
+			glLineWidth(5);
+			glBegin(GL_LINES);
+			glColor3f(0.0, 0.0, 1.0);
+			glVertex3f(0, 0, 0);
+			glVertex3f(0, 0, -20);
+			glEnd();
+
+			
+		}
+	}
+};
+
+static const int img_num = 1;
 
 int main()
 {
@@ -24,28 +99,78 @@ int main()
 	std::string folder_name = "../Capdata";
 	cap_imgs = loadImage(folder_name, img_num);
 	
-	// GLFW を初期化する
-	if (glfwInit() == GL_FALSE)
+	CamParam cparam;
+	loadCamParam("../CameraParam.txt", cparam);
+
+	//ドットパターンの検出
+	cv::Size pattern_size(12, 8);
+	std::vector<std::vector<cv::Point2f>> centers(cap_imgs.size());
+	centers = detect_circlesGrid(cap_imgs, pattern_size);
+
+	//カメラキャリブレーション
+	const double pattern_interval = 20; //20[mm]
+	//3次元点の生成
+	std::vector<std::vector<cv::Point3f>> objPoints;
+	objPoints = create_3dPoints(pattern_interval, pattern_size, cap_imgs.size());
+
+	const double fx = cparam.fx;
+	const double fy = cparam.fy;
+	const double cx = cparam.cx;
+	const double cy = cparam.cy;
+	
+	Eigen::Isometry3d pose_0;
+	pose_0.setIdentity();
+	for (int i = 0; i < cap_imgs.size(); i++)
 	{
-		// 初期化に失敗した
-		std::cerr << "Can't initialize GLFW" << std::endl;
-		return 1;
+		cv::Mat rvec;
+		cv::Mat tvec;
+		Eigen::Isometry3d pose;
+		pose.setIdentity();
+		std::vector<Eigen::Vector2d> imgPoints;
+		std::vector<Eigen::Vector3d> tmp_objPoints;
+		for (int j = 0; j < centers[i].size(); j++)
+		{
+			double u = double(centers[i][j].x);
+			double v = double(centers[i][j].y);
+
+			double x = 0;
+			double y = 0;
+			normalize(fx, fy, cx, cy, u, v, x, y);
+			imgPoints.push_back(Eigen::Vector2d(x, y));
+
+			double X = double(objPoints[i][j].x);
+			double Y = double(objPoints[i][j].y);
+			double Z = double(objPoints[i][j].z);
+			tmp_objPoints.push_back(Eigen::Vector3d(X, Y, Z));
+		}
+
+
+		//calcPose_Plane(tmp_objPoints, imgPoints, cameraMatrix_eigen, pose);
+		calcPose(tmp_objPoints, imgPoints, pose);
+		Eigen::Matrix3f R = pose.rotation().matrix().cast<float>();
+		cv::eigen2cv(R, rvec);
+		cv::Rodrigues(rvec, rvec);
+		Eigen::Vector3f t = pose.translation().matrix().cast<float>();
+		cv::eigen2cv(t, tvec);
+		//cv::solvePnP(objPoints[i], centers[i], cameraMatrix, distCoeffs, rvec, tvec, cv::SOLVEPNP_ITERATIVE);
+
+		//std::cout << "eigen_R : " << R << std::endl;
+		//std::cout << "eigen_t : " << t << std::endl;
+		cv::Rodrigues(rvec, rvec);
+		//std::cout << "cv_R : " << rvec << std::endl;
+		//std::cout << "cv_t : " << tvec << std::endl;
+
+		//cv::imshow("cap_img", cap_imgs[i]);
+		//cv::waitKey(0);
+		if (i == 0) pose_0 = pose;
 	}
+	std::cout << pose_0.matrix() << std::endl;
 
-	// プログラム終了時の処理を登録する
-	atexit(glfwTerminate);
-
-	// OpenGL Version 3.2 Core Profile を選択する
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-	// ウィンドウを作成する
-	Window window(1280, 720);
-
-	// 背景色を指定する
-	glClearColor(1.0f, 1.0f, 1.0f, 0.0f);
+	Test window;
+	window.capimg = cap_imgs;
+	window.cparam = cparam;
+	window.pose = pose_0;
+	window.execute("test", 1280, 720);
 
 
 	return EXIT_SUCCESS;

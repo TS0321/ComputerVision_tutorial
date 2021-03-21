@@ -27,7 +27,7 @@ set(GLEW_DIR "c:/lib/GLEW")
 
 link_directories(${GLFW_DIR}/lib)
 link_directories(${GLEW_DIR}/lib)
-add_executable(tutorial_3 tutorial_3/main.cpp loadimage.cpp loadimage.hpp shader.hpp shader.cpp window.hpp window.cpp shape.hpp shape.cpp object.hpp object.cpp)
+add_executable(tutorial_3 tutorial_3/main.cpp loadimage.cpp loadimage.hpp window.hpp window.cpp CameraCalibration.hpp CameraCalibration.cpp CalcPose.hpp CalcPose.cpp)
 find_package(OpenGL REQUIRED)
 target_link_libraries(tutorial_3 PUBLIC opengl32.lib)
 target_include_directories(tutorial_3 PUBLIC ${GLFW_DIR}/include)

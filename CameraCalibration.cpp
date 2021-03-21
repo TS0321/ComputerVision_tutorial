@@ -1,5 +1,6 @@
 #include "CameraCalibration.hpp"
-
+#include <fstream>
+#include <sstream>
 std::vector<std::vector<cv::Point2f>> detect_circlesGrid(const std::vector<cv::Mat>& cap_imgs, const cv::Size& pattern_size)
 {
 	std::vector<std::vector<cv::Point2f>> centers(cap_imgs.size());
@@ -37,3 +38,55 @@ std::vector<std::vector<cv::Point3f>> create_3dPoints(const double pattern_inter
 
 	return objPoints;
 }
+
+void writeCamParam(cv::Mat cameraMatrix, cv::Mat distCoeffs, std::string filename)
+{
+	std::ofstream ofs(filename);
+	ofs << "fx, " << cameraMatrix.at<double>(0, 0) << std::endl;
+	ofs << "fy, " << cameraMatrix.at<double>(1, 1) << std::endl;
+	ofs << "cx, " << cameraMatrix.at<double>(0, 2) << std::endl;
+	ofs << "cy, " << cameraMatrix.at<double>(1, 2) << std::endl;
+	ofs << "k1, " << distCoeffs.at<double>(0) << std::endl;
+	ofs << "k2, " << distCoeffs.at<double>(1) << std::endl;
+	ofs << "p1, " << distCoeffs.at<double>(2) << std::endl;
+	ofs << "p2, " << distCoeffs.at<double>(3) << std::endl;
+	ofs << "k3, " << distCoeffs.at<double>(4) << std::endl;
+	ofs.close();
+}
+
+void loadCamParam(std::string filename, CamParam &cparam)
+{
+	std::ifstream ifs(filename);
+	double& fx = cparam.fx;
+	double& fy = cparam.fy;
+	double& cx = cparam.cx;
+	double& cy = cparam.cy;
+	double& k1 = cparam.k1;
+	double& k2 = cparam.k2;
+	double& p1 = cparam.p1;
+	double& p2 = cparam.p2;
+	double& k3 = cparam.k3;
+
+	std::string buf;
+	std::vector<double> params;
+	while (std::getline(ifs, buf))
+	{
+		std::string fn;
+		std::istringstream iss(buf);
+		std::getline(iss, fn, ',');
+		double num;
+		iss >> num;
+		params.push_back(num);
+	}
+
+	fx = params[0];
+	fy = params[1];
+	cx = params[2];
+	cy = params[3];
+	k1 = params[4];
+	k2 = params[5];
+	p1 = params[6];
+	p2 = params[7];
+	k3 = params[8];
+}
+

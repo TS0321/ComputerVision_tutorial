@@ -1,104 +1,205 @@
 #include "window.hpp"
 
+#include <iostream>
 
-Window::~Window()
-{
-    // ウィンドウを破棄する
-    glfwDestroyWindow(window);
+void load2D(const int w, const int h) {
+	GLint viewport[4];
+	glGetIntegerv(GL_VIEWPORT, viewport);		
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(-0.5, viewport[2] - 0.5, viewport[3] - 0.5, -0.5, -1.0, 1.0);
+	
+	double mat[4 * 4] = { 0 };
+
+	{
+		const double shiftx = (viewport[2] - 1) * 0.5 - (w - 1) * 0.5;
+		const double shifty = (viewport[3] - 1) * 0.5 - (h - 1) * 0.5;
+
+		mat[0 * 4 + 0] = 1.0;
+		mat[1 * 4 + 1] = 1.0;
+		mat[2 * 4 + 2] = 1.0;
+		mat[3 * 4 + 3] = 1.0;
+
+		mat[3 * 4 + 0] = shiftx;
+		mat[3 * 4 + 1] = shifty;
+
+	}
+
+	glMultMatrixd(mat);
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
 }
 
-// ウィンドウを閉じるべきかを判定する
-int Window::shouldClose() const
-{
-    return glfwWindowShouldClose(window) || glfwGetKey(window, GLFW_KEY_ESCAPE);
+void load3D(const int w, const int h, const double fx, const double fy, const double cx, const double cy, const double nearPlane, const double farPlane) {
+	GLint viewport[4];
+	glGetIntegerv(GL_VIEWPORT, viewport);
+
+	double mat[4 * 4] = { 0 };
+	
+	{
+		const double dx = (viewport[2] - 1) * 0.5 - ((w - 1) * 0.5 - cx);
+		const double dy = (viewport[3] - 1) * 0.5 - ((h - 1) * 0.5 - cy);
+
+		const double nx = nearPlane / fx;
+		const double ny = nearPlane / fy;
+
+		const double sw = (viewport[2] - 1);
+		const double sh = (viewport[3] - 1);
+
+		const double l = (-dx) * nx;
+		const double r = (-dx + sw) * nx;
+		const double t = (-dy) * ny;
+		const double b = (-dy + sh) * ny;
+		const double n = nearPlane;
+		const double f = farPlane;
+
+		mat[0 * 4 + 0] = 2 * n / (r - l);
+		mat[1 * 4 + 1] = 2 * n / (t - b);
+
+		mat[2 * 4 + 0] = -(r + l) / (r - l);
+		mat[2 * 4 + 1] = -(t + b) / (t - b);
+		mat[2 * 4 + 2] = +(f + n) / (f - n);
+		mat[2 * 4 + 3] = 1.0;
+
+		mat[3 * 4 + 2] = -2 * f * n / (f - n);
+		mat[3 * 4 + 3] = 1.0;
+
+		/*const double l = -cx;
+		const double r = w - cx;
+		const double t = cy;
+		const double b = -(h - cy);
+		const double n = nearPlane;
+		const double f = farPlane;
+
+		mat[0 * 4 + 0] = 2 * fx / (r - l);
+		mat[1 * 4 + 1] = 2 * fy / (t - b);
+
+		mat[2 * 4 + 0] = -(r + l) / (r - l);
+		mat[2 * 4 + 1] = -(t + b) / (t - b);
+		mat[2 * 4 + 2] = (f + n) / (f - n);
+		mat[2 * 4 + 3] = 1.0;
+
+		mat[3 * 4 + 2] = -(2 * f * n) / (f - n);*/
+
+	}
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadMatrixd(mat);
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
 }
 
-// カラーバッファを入れ替えてイベントを取り出す
-void Window::swapBuffers()
-{
-    // カラーバッファを入れ替える
-    glfwSwapBuffers(window);
+void dispImg(const unsigned char* ptr, const int w, const int h, const int ch) {
 
-    // イベントを取り出す
-    if (keyStatus == GLFW_RELEASE)
-        glfwWaitEvents();
-    else
-        glfwPollEvents();
+	int format;
+	switch (ch) {
+	case 1: format = GL_LUMINANCE; break;
+	case 3: format = GL_RGB; break;
+	default: return;
+	}
 
-    // キーボードの状態を調べる
-    if (glfwGetKey(window, GLFW_KEY_LEFT) != GLFW_RELEASE)
-        location[0] -= 2.0f / size[0];
-    else if (glfwGetKey(window, GLFW_KEY_RIGHT) != GLFW_RELEASE)
-        location[0] += 2.0f / size[0];
-    if (glfwGetKey(window, GLFW_KEY_DOWN) != GLFW_RELEASE)
-        location[1] -= 2.0f / size[1];
-    else if (glfwGetKey(window, GLFW_KEY_UP) != GLFW_RELEASE)
-        location[1] += 2.0f / size[1];
+	unsigned int texid;
+	{
+		glGenTextures(1, &texid);
 
-    // マウスの左ボタンの状態を調べる
-    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) != GLFW_RELEASE)
-    {
-        // マウスの左ボタンが押されていたらマウスカーソルの位置を取得する
-        double x, y;
-        glfwGetCursorPos(window, &x, &y);
+		glBindTexture(GL_TEXTURE_2D, texid);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-        // マウスカーソルの正規化デバイス座標系上での位置を求める
-        location[0] = static_cast<GLfloat>(x) * 2.0f / size[0] - 1.0f;
-        location[1] = 1.0f - static_cast<GLfloat>(y) * 2.0f / size[1];
-    }
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, format, GL_UNSIGNED_BYTE, ptr);
+	}
+
+	glPushAttrib(GL_ENABLE_BIT);
+	glEnable(GL_TEXTURE_2D);
+
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+		glBindTexture(GL_TEXTURE_2D, texid);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+		glColor3d(1.0, 1.0, 1.0);
+		glColorMask(1, 1, 1, 1);
+
+		glBegin(GL_QUADS);
+		glTexCoord2i(0, 0); glVertex2d(0 - 0.5, 0 - 0.5);
+		glTexCoord2i(0, 1); glVertex2d(0 - 0.5, h - 0.5);
+		glTexCoord2i(1, 1); glVertex2d(w - 0.5, h - 0.5);
+		glTexCoord2i(1, 0); glVertex2d(w - 0.5, 0 - 0.5);
+		glEnd();
+
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
+	glPopAttrib();
+
+	glDeleteTextures(1, &texid);
 }
 
-// ウィンドウのサイズを取り出す
-const GLfloat* Window::getSize() const { return size; }
-
-// ワールド座標系に対するデバイス座標系の拡大率を取り出す
-GLfloat Window::getScale() const { return scale; }
-
-// 位置を取り出す
-const GLfloat* Window::getLocation() const { return location; }
-
-// ウィンドウのサイズ変更時の処理
-void Window::resize(GLFWwindow* window, int width, int height)
+void dispImg(cv::Mat& img, const int w, const int h, const int ch)
 {
-    // ウィンドウ全体をビューポートにする
-    glViewport(0, 0, width, height);
+	int format;
+	switch (ch) {
+	case 1: format = GL_LUMINANCE; break;
+	case 3: format = GL_BGR_EXT; break;
+	default: return;
+	}
 
-    // このインスタンスの this ポインタを得る
-    Window* const
-        instance(static_cast<Window*>(glfwGetWindowUserPointer(window)));
+	unsigned int texid;
+	{
+		glGenTextures(1, &texid);
 
-    if (instance != NULL)
-    {
-        // 開いたウィンドウのサイズを保存する
-        instance->size[0] = static_cast<GLfloat>(width);
-        instance->size[1] = static_cast<GLfloat>(height);
-    }
-}
+		glBindTexture(GL_TEXTURE_2D, texid);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-// マウスホイール操作時の処理
-void Window::wheel(GLFWwindow* window, double x, double y)
-{
-    // このインスタンスの this ポインタを得る
-    Window* const
-        instance(static_cast<Window*>(glfwGetWindowUserPointer(window)));
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
-    if (instance != NULL)
-    {
-        // ワールド座標系に対するデバイス座標系の拡大率を更新する
-        instance->scale += static_cast<GLfloat>(y);
-    }
-}
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
 
-// キーボード操作時の処理
-void Window::keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-    // このインスタンスの this ポインタを得る
-    Window* const
-        instance(static_cast<Window*>(glfwGetWindowUserPointer(window)));
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, format, GL_UNSIGNED_BYTE, img.data);
+	}
 
-    if (instance != NULL)
-    {
-        // キーの状態を保存する
-        instance->keyStatus = action;
-    }
+	glPushAttrib(GL_ENABLE_BIT);
+	glEnable(GL_TEXTURE_2D);
+
+	{
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+		glBindTexture(GL_TEXTURE_2D, texid);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+		glColor3d(1.0, 1.0, 1.0);
+		glColorMask(1, 1, 1, 1);
+
+		glBegin(GL_QUADS);
+		glTexCoord2i(0, 0); glVertex2d(0 - 0.5, 0 - 0.5);
+		glTexCoord2i(0, 1); glVertex2d(0 - 0.5, h - 0.5);
+		glTexCoord2i(1, 1); glVertex2d(w - 0.5, h - 0.5);
+		glTexCoord2i(1, 0); glVertex2d(w - 0.5, 0 - 0.5);
+		glEnd();
+
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
+	glPopAttrib();
+
+	glDeleteTextures(1, &texid);
 }

@@ -1,96 +1,102 @@
-#pragma once
-#include <iostream>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <opencv2/opencv.hpp>
 
-class Window
-{
-    // ウィンドウの識別子
-    GLFWwindow* const window;
+class Window {
+public:
+	virtual void mouseButton(int button, int action, int mods) {
+	
+	}
+	virtual void mousePos(double x, double y) {
 
-    // ウィンドウのサイズ
-    GLfloat size[2];
+	}
+	virtual void mouseScroll(double x, double y) {
 
-    // ワールド座標系に対するデバイス座標系の拡大率
-    GLfloat scale;
+	}
+	virtual void keyFun(int key, int scancode, int action, int mods) {
 
-    // 図形の正規化デバイス座標系上での位置
-    GLfloat location[2];
+	}
+	virtual void display(GLFWwindow *window) {
 
-    // キーボードの状態
-    int keyStatus;
+	}
 
 public:
+	void execute(const char* name, const int width, const int height) {
+		if (!glfwInit()) return;
 
-    // コンストラクタ
-    Window(int width = 640, int height = 480, const char* title = "Hello!")
-        : window(glfwCreateWindow(width, height, title, NULL, NULL))
-        , scale(100.0f), location{ 0, 0 }, keyStatus(GLFW_RELEASE)
-    {
-        if (window == NULL)
-        {
-            // ウィンドウが作成できなかった
-            std::cerr << "Can't create GLFW window." << std::endl;
-            exit(1);
-        }
+		GLFWwindow* window = glfwCreateWindow(width, height, name, NULL, NULL);
+		if (!window) {
+			glfwTerminate();
+			return;
+		}
+		glfwMakeContextCurrent(window);
+		glfwWindowHint(GLFW_SAMPLES, 4);
 
-        // 現在のウィンドウを処理対象にする
-        glfwMakeContextCurrent(window);
+		setCallback(window);
+		glfwSwapInterval(1);
+		glClearColor(1.0, 0.0, 0.0, 1.0);
+		while (!glfwWindowShouldClose(window)) {
+			if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+				glfwSetWindowShouldClose(window, GL_TRUE);
+			}
 
-        // GLEW を初期化する
-        glewExperimental = GL_TRUE;
-        if (glewInit() != GLEW_OK)
-        {
-            // GLEW の初期化に失敗した
-            std::cerr << "Can't initialize GLEW" << std::endl;
-            exit(1);
-        }
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // 作成したウィンドウに対する設定
-        glfwSwapInterval(1);
+			display(window);
 
-        // ウィンドウのサイズ変更時に呼び出す処理の登録
-        glfwSetWindowSizeCallback(window, resize);
+			glfwSwapBuffers(window);
+			glfwWaitEvents();
+		}
 
-        // マウスホイール操作時に呼び出す処理の登録
-        glfwSetScrollCallback(window, wheel);
+		glfwTerminate();
+	}
 
-        // キーボード操作時に呼び出す処理の登録
-        glfwSetKeyCallback(window, keyboard);
+protected:
+	void _mouseButton(int button, int action, int mods) {
+		mouseButton(button, action, mods);
+	}
+	void _mousePos(double x, double y) {
+		mousePos(x, y);
+	}
+	void _mouseScroll(double x, double y) {
+		mouseScroll(x, y);
+	}
+	void _keyFun(int key, int scancode, int action, int mods) {
+		keyFun(key, scancode, action, mods);
+	}
 
-        // このインスタンスの this ポインタを記録しておく
-        glfwSetWindowUserPointer(window, this);
+protected:
+	void setCallback(GLFWwindow* window) {
+		glfwSetWindowUserPointer(window, this);
 
-        // 開いたウィンドウの初期設定
-        resize(window, width, height);
-    }
+		glfwSetMouseButtonCallback(window, mouseButtonCB);
+		glfwSetCursorPosCallback(window, mousePosCB);
+		glfwSetScrollCallback(window, mouseScrollCB);
+		glfwSetKeyCallback(window, keyFunCB);
+	}
 
+	static Window* getThisPtr(GLFWwindow* window) {
+		return static_cast<Window*>(glfwGetWindowUserPointer(window));
+	}
 
-    // デストラクタ
-    virtual ~Window();
+	static void mouseButtonCB(GLFWwindow* window, int button, int action, int mods) {
+		getThisPtr(window)->_mouseButton(button, action, mods);
+	}
 
-    // ウィンドウを閉じるべきかを判定する
-    int shouldClose() const;
+	static void mousePosCB(GLFWwindow* window, double x, double y) {
+		getThisPtr(window)->_mousePos(x, y);
+	}
 
-    // カラーバッファを入れ替えてイベントを取り出す
-    void swapBuffers();
+	static void mouseScrollCB(GLFWwindow* window, double x, double y) {
+		getThisPtr(window)->_mouseScroll(x, y);
+	}
 
-    // ウィンドウのサイズを取り出す
-    const GLfloat* getSize() const;
-
-    // ワールド座標系に対するデバイス座標系の拡大率を取り出す
-    GLfloat getScale() const;
-
-    // 位置を取り出す
-    const GLfloat* getLocation() const;
-
-    // ウィンドウのサイズ変更時の処理
-    static void resize(GLFWwindow* window, int width, int height);
-
-    // マウスホイール操作時の処理
-    static void wheel(GLFWwindow* window, double x, double y);
-
-    // キーボード操作時の処理
-    static void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods);
-
+	static void keyFunCB(GLFWwindow* window, int key, int scancode, int action, int mods) {
+		getThisPtr(window)->_keyFun(key, scancode, action, mods);
+	}
 };
+
+void load2D(const int w, const int h);
+void dispImg(const unsigned char* ptr, const int w, const int h, const int ch);
+void dispImg(cv::Mat& img, const int w, const int h, const int ch);
+void load3D(const int w, const int h, const double fx, const double fy, const double cx, const double cy, const double nearPlane = 1.0, const double farPlane = 1000.0);
