@@ -35,6 +35,7 @@ private:
 
 public:
 	cv::Mat& get_capImg();
+	CamParam& get_camParam();
 	void capture();
 };
 

@@ -5,6 +5,11 @@ cv::Mat& Camera::get_capImg()
 	return m_capImg;
 }
 
+CamParam& Camera::get_camParam()
+{
+	return m_CamParam;
+}
+
 void Camera::capture()
 {
 	m_cap.read(m_capImg);
