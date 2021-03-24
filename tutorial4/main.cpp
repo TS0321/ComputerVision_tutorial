@@ -14,14 +14,15 @@ int main(void)
 	Tracker tracker;
 	tracker.set_camera(&camera);
 	tracker.create_3dPoints(cv::Size(12, 8), 20);
-	
+	CamParam& c = camera.get_camParam();
+
 	while (true) {
 		camera.capture();
 		if (tracker.detect())
 		{
 			tracker.estimatePose();
 		}
-		Eigen::Isometry3d pose = tracker.getPose();
+		Eigen::Isometry3d& pose = tracker.getPose();
 		Eigen::Matrix3f R = pose.rotation().matrix().cast<float>();
 		cv::Mat rvec, tvec;
 		cv::eigen2cv(R, rvec);

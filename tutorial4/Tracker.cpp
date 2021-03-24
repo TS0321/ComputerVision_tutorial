@@ -203,12 +203,12 @@ bool Tracker::optimizePose(const std::vector<Eigen::Vector3d>& objPoints, const 
 
 bool Tracker::detect()
 {
-	cv::Mat cap_img = camera->get_capImg();
+	cv::Mat& cap_img = camera->get_capImg();
 	std::vector<cv::Point2f> centers;
 	bool isFound = cv::findCirclesGrid(cap_img, pattern_size, centers);
 	if (!isFound) return false;
 	m_imgPoints.resize(centers.size());
-	CamParam cparam = camera->get_camParam();
+	CamParam& cparam = camera->get_camParam();
 	const double fx = cparam.fx;
 	const double fy = cparam.fy;
 	const double cx = cparam.cx;
