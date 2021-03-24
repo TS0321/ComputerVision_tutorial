@@ -35,9 +35,9 @@ int main(void)
 			Eigen::Vector3f t = pose.translation().matrix().cast<float>();
 			cv::eigen2cv(t, tvec);
 			cv::aruco::drawAxis(camera.get_capImg(), cameraMatrix, distCoeffs, rvec, tvec, 40);
-			cv::imshow("capimg", camera.get_capImg());
-			cv::waitKey(1);
 		}
+		cv::imshow("capimg", camera.get_capImg());
+		cv::waitKey(1);
 
 	}
 
