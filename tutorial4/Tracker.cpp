@@ -90,7 +90,7 @@ bool Tracker::calcPose(const std::vector<Eigen::Vector3d>& objPoints, const std:
 	pose.prerotate(R);
 	pose.pretranslate(t);
 
-	if (optimizePose(objPoints, imgPoints, pose, 10, 0.001))
+	if (optimizePose(objPoints, imgPoints, pose, 5, 0.001))
 	{
 		current_pose = pose;
 	}
@@ -206,6 +206,7 @@ bool Tracker::detect()
 	cv::Mat& cap_img = camera->get_capImg();
 	std::vector<cv::Point2f> centers;
 	bool isFound = cv::findCirclesGrid(cap_img, pattern_size, centers);
+
 	if (!isFound) return false;
 	m_imgPoints.resize(centers.size());
 	CamParam& cparam = camera->get_camParam();
