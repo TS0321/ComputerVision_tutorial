@@ -10,6 +10,16 @@ CamParam& Camera::get_camParam()
 	return m_CamParam;
 }
 
+const int& Camera::get_width()
+{
+	return m_width;
+}
+
+const int& Camera::get_height()
+{
+	return m_height;
+}
+
 void Camera::capture()
 {
 	m_cap.read(m_capImg);
