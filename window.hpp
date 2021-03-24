@@ -1,7 +1,8 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <opencv2/opencv.hpp>
-
+#include <stdio.h>
+#include <chrono>
 class Window {
 public:
 	virtual void mouseButton(int button, int action, int mods) {
@@ -22,6 +23,8 @@ public:
 
 public:
 	void execute(const char* name, const int width, const int height) {
+		using namespace std;
+		chrono::system_clock::time_point start, end;
 		if (!glfwInit()) return;
 
 		GLFWwindow* window = glfwCreateWindow(width, height, name, NULL, NULL);
@@ -41,11 +44,14 @@ public:
 			}
 
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			start = chrono::system_clock::now();
 
 			display(window);
-
+			end = chrono::system_clock::now();
+			double time = static_cast<double>(chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0);
+			printf("time %lf[ms]\n", time);
 			glfwSwapBuffers(window);
-			glfwWaitEvents();
+			glfwPollEvents();
 		}
 
 		glfwTerminate();

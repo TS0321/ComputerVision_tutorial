@@ -1,10 +1,15 @@
 #include "AR_Core.hpp"
 
-void AR_Core::processFrame()
+bool AR_Core::processFrame()
 {
 	m_camera.capture();
-	if (m_tracker.detect())
+	if (!m_tracker.detect())
 	{
-		m_tracker.estimatePose();
+		return false;
 	}
+
+	std::cout << "detected!" << std::endl;
+	m_tracker.estimatePose();
+	
+	return true;
 }

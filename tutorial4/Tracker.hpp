@@ -14,8 +14,8 @@ public:
 
 private:
 	Camera* camera;
-	Eigen::Isometry3d m_currentPose;
 	std::vector<Eigen::Vector3d> m_objPoints;
+	Eigen::Isometry3d m_currentPose;
 	std::vector<Eigen::Vector2d> m_imgPoints;
 	cv::Size pattern_size;
 
