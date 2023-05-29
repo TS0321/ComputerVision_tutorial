@@ -160,7 +160,7 @@ cv::Mat findHomographyWithRansac(std::vector<cv::Point>& srcPoints, std::vector<
 int main(void)
 {
 	cv::Mat img0 = cv::imread("../image/shiba04.bmp", cv::IMREAD_GRAYSCALE);
-	cv::Mat img1 = cv::imread("../image/shiba02.bmp", cv::IMREAD_GRAYSCALE);
+	cv::Mat img1 = cv::imread("../image/shiba01.bmp", cv::IMREAD_GRAYSCALE);
 
 	cv::imshow("img", img1);
 	cv::waitKey(0);
